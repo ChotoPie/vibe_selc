@@ -1,7 +1,25 @@
-import { dummyLinks, dummyUser } from '../data/links';
+'use client';
+
+import { useState } from 'react';
+import { dummyLinks, dummyUser, LinkItem } from '../data/links';
 import { Card, CardContent } from "@/components/ui/card";
+import { LinkAddDialog } from '@/components/LinkAddDialog';
 
 export default function LinksPage() {
+  const [links, setLinks] = useState<LinkItem[]>(dummyLinks);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const handleAddLink = (title: string, url: string) => {
+    const newLink: LinkItem = {
+      id: `link_${Date.now()}`,
+      title,
+      url,
+      // URL 형식을 간단히 체크해서 http가 없으면 붙이기는 생략하고 도메인만 추출하거나 통과
+      icon: `https://s2.googleusercontent.com/s2/favicons?domain=${url}`,
+    };
+    setLinks([newLink, ...links]);
+  };
+
   return (
     <div className="relative flex flex-col items-center min-h-screen bg-[#030014] text-slate-200 p-6 sm:p-12 font-sans overflow-hidden selection:bg-purple-500/30">
       
@@ -34,9 +52,20 @@ export default function LinksPage() {
           {dummyUser.bio}
         </p>
 
+        {/* Add Link Button */}
+        <button
+          onClick={() => setIsDialogOpen(true)}
+          className="mb-8 px-6 py-3.5 bg-white/5 hover:bg-white/10 text-white rounded-2xl border border-white/10 transition-all duration-300 flex items-center justify-center gap-3 font-semibold w-full max-w-sm backdrop-blur-md hover:shadow-[0_0_2rem_-0.5rem_rgba(168,85,247,0.4)] hover:border-purple-500/50 group"
+        >
+          <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center group-hover:bg-purple-500/40 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-purple-300"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          </div>
+          새로운 링크 추가하기
+        </button>
+
         {/* Links List */}
         <div className="w-full flex flex-col gap-5 animate-in fade-in slide-in-from-bottom-12 duration-1000 fill-mode-both">
-          {dummyLinks.map((link, i) => (
+          {links.map((link, i) => (
             <a
               key={link.id}
               href={link.url}
@@ -86,6 +115,12 @@ export default function LinksPage() {
         </div>
 
       </div>
+
+      <LinkAddDialog 
+        isOpen={isDialogOpen} 
+        onClose={() => setIsDialogOpen(false)} 
+        onAdd={handleAddLink} 
+      />
     </div>
   );
 }
