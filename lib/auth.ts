@@ -56,7 +56,10 @@ export const signInWithGoogle = async () => {
     const result = await signInWithPopup(auth, googleProvider);
     const displayName = await syncUserProfile(result.user);
     return { user: result.user, displayName };
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === 'auth/popup-blocked') {
+      alert("브라우저 팝업 차단이 감지되었습니다!\n\n주소창 우측(또는 좌측)의 🚫 팝업 차단 아이콘을 클릭하여 '항상 허용'으로 변경한 후 다시 시도해 주세요.");
+    }
     console.error("Error signing in with Google: ", error);
     throw error;
   }
