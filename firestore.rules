@@ -23,7 +23,7 @@ service cloud.firestore {
         // 쓰기(수정): 본인이거나, 본인이 아니더라도 오직 'clicks' 필드만 1 증가시키는 업데이트는 누구나 허용
         allow update: if (request.auth != null && request.auth.uid == userId)
                       || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clicks'])
-                          && request.resource.data.clicks == resource.data.clicks + 1);
+                          && request.resource.data.clicks == (('clicks' in resource.data) ? resource.data.clicks + 1 : 1));
       }
     }
     
