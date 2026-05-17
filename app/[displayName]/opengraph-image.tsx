@@ -10,10 +10,12 @@ export const size = {
 
 export const contentType = 'image/png';
 
-export default async function Image({ params }: { params: { displayName: string } }) {
-  const displayName = params.displayName;
+export default async function Image({ params }: { params: Promise<{ displayName: string }> | { displayName: string } }) {
+  // Next.js 버전에 따라 params가 Promise일 수 있으므로 await 처리
+  const resolvedParams = await params;
+  const displayName = resolvedParams?.displayName || "";
   
-  let username = displayName;
+  let username = displayName || "User";
   let bio = "단 하나의 링크로 당신의 모든 것을 보여주세요.";
   
   // Edge 런타임 호환성을 위해 Firestore REST API 사용
@@ -108,7 +110,7 @@ export default async function Image({ params }: { params: { displayName: string 
               boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
             }}
           >
-            {username.charAt(0).toUpperCase()}
+            {username ? username.charAt(0).toUpperCase() : "U"}
           </div>
 
           <h1
