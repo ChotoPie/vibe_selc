@@ -47,7 +47,7 @@ export default function RootLayout({
       suppressHydrationWarning
       className={cn("antialiased", fontMono.variable, "font-sans", notoSans.variable)}
     >
-      <body>
+      <body suppressHydrationWarning>
         <Providers>
           <ThemeProvider>{children}</ThemeProvider>
         </Providers>
