@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { LinkItem } from "@/data/links";
+import { LinkCard } from "@/components/LinkCard";
 import { auth, db } from "@/lib/firebase";
-import { collection, addDoc, onSnapshot, serverTimestamp, query, orderBy, deleteDoc, doc } from "firebase/firestore";
+import { collection, addDoc, onSnapshot, serverTimestamp, query, orderBy } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { IconShare, IconPlus, IconLogout, IconTrash } from "@tabler/icons-react";
+import { IconShare, IconPlus, IconLogout } from "@tabler/icons-react";
 import {
   Dialog,
   DialogContent,
@@ -116,22 +116,6 @@ export default function Page() {
     }
   };
 
-  const handleDeleteLink = async (e: React.MouseEvent, id: string) => {
-    e.preventDefault(); // 링크 이동 방지
-    e.stopPropagation();
-
-    if (!isOwner) return;
-
-    if (window.confirm("이 링크를 정말 삭제하시겠습니까?")) {
-      try {
-        await deleteDoc(doc(db, "users", "anonymous", "links", id));
-      } catch (error) {
-        console.error("Error deleting document: ", error);
-        alert("링크 삭제 중 오류가 발생했습니다.");
-      }
-    }
-  };
-
   const handleLogout = async () => {
     await logout();
   };
@@ -235,42 +219,7 @@ export default function Page() {
             </div>
           ) : (
             links.map((link) => (
-              <a
-                key={link.id}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group w-full outline-none block"
-              >
-              <Card className="relative flex items-center p-4 h-[68px] transition-all duration-300 ease-out border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md hover:-translate-y-1 hover:border-zinc-300 dark:hover:border-zinc-700 rounded-[20px] group-focus-visible:ring-2 group-focus-visible:ring-zinc-900 dark:group-focus-visible:ring-zinc-300 cursor-pointer">
-                
-                <div className="absolute left-4 flex-shrink-0 w-11 h-11 flex items-center justify-center bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 rounded-full group-hover:scale-105 transition-transform duration-300">
-                  <img
-                    src={link.icon}
-                    alt={`${link.title} icon`}
-                    className="w-5 h-5 object-contain"
-                  />
-                </div>
-                
-                <div className="w-full flex justify-center px-14">
-                  <span className="font-semibold text-[15px] tracking-tight text-zinc-800 dark:text-zinc-200 truncate">
-                    {link.title}
-                  </span>
-                </div>
-                
-                {isOwner && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-4 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-full z-10 transition-colors"
-                    onClick={(e) => handleDeleteLink(e, link.id)}
-                  >
-                    <IconTrash className="w-5 h-5" stroke={1.5} />
-                  </Button>
-                )}
-                
-              </Card>
-            </a>
+              <LinkCard key={link.id} link={link} isOwner={isOwner} />
             ))
           )}
         </div>
