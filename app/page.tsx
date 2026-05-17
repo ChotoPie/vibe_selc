@@ -26,23 +26,35 @@ export default function Page() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newLinkTitle, setNewLinkTitle] = useState("");
   const [newLinkUrl, setNewLinkUrl] = useState("");
+  const [urlError, setUrlError] = useState("");
 
   const handleAddLink = (e: React.FormEvent) => {
     e.preventDefault();
+    setUrlError("");
     if (!newLinkTitle || !newLinkUrl) return;
 
     let domain = "google.com";
+    let formattedUrl = newLinkUrl;
+    
     try {
-      const url = new URL(newLinkUrl.startsWith('http') ? newLinkUrl : `https://${newLinkUrl}`);
+      formattedUrl = newLinkUrl.startsWith('http') ? newLinkUrl : `https://${newLinkUrl}`;
+      const url = new URL(formattedUrl);
       domain = url.hostname;
+      
+      // Basic validation: domain should contain a dot
+      if (!domain.includes('.')) {
+        setUrlError("올바른 URL 형식을 입력해주세요. (예: github.com)");
+        return;
+      }
     } catch (error) {
-      // URL 파싱 에러 시 무시하고 기본값 사용
+      setUrlError("올바른 URL 형식을 입력해주세요.");
+      return;
     }
 
     const newLink: LinkItem = {
       id: crypto.randomUUID(),
       title: newLinkTitle,
-      url: newLinkUrl.startsWith('http') ? newLinkUrl : `https://${newLinkUrl}`,
+      url: formattedUrl,
       icon: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
     };
 
@@ -76,7 +88,14 @@ export default function Page() {
         {/* 링크 목록 영역 */}
         <div className="w-full flex flex-col gap-3">
           {/* 링크 추가 버튼 및 다이얼로그 */}
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) {
+              setNewLinkTitle("");
+              setNewLinkUrl("");
+              setUrlError("");
+            }
+          }}>
             <DialogTrigger asChild>
               <Button variant="outline" className="w-full h-14 rounded-[20px] border-dashed border-2 border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all">
                 <IconPlus className="w-5 h-5 mr-2" />
@@ -98,13 +117,18 @@ export default function Page() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="url">URL 주소</Label>
+                  <Label htmlFor="url" className={urlError ? "text-red-500" : ""}>URL 주소</Label>
                   <Input
                     id="url"
                     placeholder="예: github.com/username"
                     value={newLinkUrl}
-                    onChange={(e) => setNewLinkUrl(e.target.value)}
+                    onChange={(e) => {
+                      setNewLinkUrl(e.target.value);
+                      if (urlError) setUrlError("");
+                    }}
+                    className={urlError ? "border-red-500 focus-visible:ring-red-500" : ""}
                   />
+                  {urlError && <p className="text-sm text-red-500 font-medium">{urlError}</p>}
                 </div>
                 <div className="flex justify-end pt-4">
                   <Button type="submit" disabled={!newLinkTitle || !newLinkUrl}>추가하기</Button>
