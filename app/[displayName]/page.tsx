@@ -69,6 +69,24 @@ export default function ProfilePage() {
       const querySnapshot = await getDocs(q);
       
       if (querySnapshot.empty) {
+        if (displayName === "anonymous") {
+          // DB에 없어도 볼 수 있는 기본(체험용) 익명 프로필 제공
+          setProfileUid("anonymous");
+          setProfileData({
+            username: "익명 사용자",
+            bio: "이곳은 누구나 구경할 수 있는 체험용 페이지입니다.\n우측 상단의 'Google 로그인'을 눌러 나만의 페이지를 만들어보세요!",
+          });
+          
+          const linksQuery = query(collection(db, "users", "anonymous", "links"), orderBy("createdAt", "asc"));
+          const unsubscribeLinks = onSnapshot(linksQuery, (snapshot) => {
+            const fetchedLinks: LinkItem[] = snapshot.docs.map(doc => ({
+              id: doc.id, title: doc.data().title, url: doc.data().url, icon: doc.data().icon,
+            }));
+            setLinks(fetchedLinks);
+          });
+          return () => unsubscribeLinks();
+        }
+
         setNotFound(true);
         return;
       }
