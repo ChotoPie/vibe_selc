@@ -7,7 +7,7 @@ import { auth, db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp, query, orderBy, getDocs, doc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { Button } from "@/components/ui/button";
-import { IconShare, IconPlus, IconLogout } from "@tabler/icons-react";
+import { IconShare, IconPlus, IconLogout, IconLink, IconBrandGoogle, IconLayoutDashboard, IconDeviceDesktopAnalytics } from "@tabler/icons-react";
 import {
   Dialog,
   DialogContent,
@@ -153,19 +153,80 @@ export default function Page() {
   // 비로그인 상태 (랜딩 및 안내 화면)
   if (!currentUser) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-6 bg-zinc-50 dark:bg-zinc-950 text-foreground font-sans selection:bg-zinc-200 dark:selection:bg-zinc-800">
-        <div className="max-w-md w-full text-center space-y-8">
-          <h1 className="text-5xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100">
-            My-Link
-          </h1>
-          <p className="text-zinc-600 dark:text-zinc-400 text-lg leading-relaxed">
-            단 하나의 링크로 당신의 모든 것을 보여주세요.<br />
-            서비스를 이용하려면 로그인해주세요.
-          </p>
-          <Button onClick={handleLogin} className="w-full h-14 text-md rounded-full mt-8 shadow-md" size="lg">
-            Google 계정으로 시작하기
-          </Button>
+      <div className="flex flex-col min-h-screen bg-zinc-50 dark:bg-zinc-950 text-foreground font-sans selection:bg-zinc-200 dark:selection:bg-zinc-800">
+        {/* 헤더/히어로 영역 */}
+        <div className="flex flex-col items-center justify-center flex-grow p-6 relative overflow-hidden min-h-[70vh]">
+          {/* 장식용 배경 그라데이션 */}
+          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/20 dark:bg-blue-500/10 rounded-full blur-[100px] pointer-events-none" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/20 dark:bg-purple-500/10 rounded-full blur-[100px] pointer-events-none" />
+          
+          <div className="max-w-md w-full text-center space-y-8 relative z-10 flex flex-col items-center">
+            <div className="inline-flex items-center justify-center p-4 bg-white dark:bg-zinc-900 rounded-[24px] shadow-sm border border-zinc-200 dark:border-zinc-800 mb-2">
+              <IconLink stroke={2.5} className="w-10 h-10 text-zinc-900 dark:text-zinc-100" />
+            </div>
+            <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100">
+              My-Link
+            </h1>
+            <p className="text-zinc-600 dark:text-zinc-400 text-lg md:text-xl leading-relaxed">
+              단 하나의 링크로 당신의 모든 것을 보여주세요.<br />
+              지금 바로 시작하고 나만의 페이지를 만드세요.
+            </p>
+            <Button onClick={handleLogin} className="w-full h-14 text-md rounded-full mt-8 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5" size="lg">
+              <IconBrandGoogle className="w-5 h-5 mr-2" />
+              Google 계정으로 시작하기
+            </Button>
+          </div>
         </div>
+
+        {/* 특징(Features) 영역 */}
+        <div className="w-full bg-white dark:bg-zinc-900 py-24 px-6 border-t border-zinc-200 dark:border-zinc-800 relative z-10">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-16 space-y-4">
+              <h2 className="text-3xl md:text-4xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">왜 My-Link를 선택해야 할까요?</h2>
+              <p className="text-zinc-500 dark:text-zinc-400 text-lg">복잡한 설정 없이 단 1분 만에 완성되는 모던한 포트폴리오</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {/* Feature 1 */}
+              <div className="flex flex-col items-center text-center p-8 rounded-[32px] bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800 transition-all hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-sm">
+                <div className="w-14 h-14 rounded-full bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center mb-6 text-blue-600 dark:text-blue-400">
+                  <IconLayoutDashboard className="w-7 h-7" />
+                </div>
+                <h3 className="font-bold text-xl mb-3 text-zinc-900 dark:text-zinc-100">초간편 관리</h3>
+                <p className="text-zinc-500 dark:text-zinc-400 text-base leading-relaxed">
+                  직관적인 대시보드를 통해 클릭 몇 번으로 링크를 추가하고 실시간으로 수정하세요.
+                </p>
+              </div>
+
+              {/* Feature 2 */}
+              <div className="flex flex-col items-center text-center p-8 rounded-[32px] bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800 transition-all hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-sm">
+                <div className="w-14 h-14 rounded-full bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center mb-6 text-purple-600 dark:text-purple-400">
+                  <IconDeviceDesktopAnalytics className="w-7 h-7" />
+                </div>
+                <h3 className="font-bold text-xl mb-3 text-zinc-900 dark:text-zinc-100">모던한 디자인</h3>
+                <p className="text-zinc-500 dark:text-zinc-400 text-base leading-relaxed">
+                  주소를 입력하면 구글 API를 통해 사이트 로고를 자동으로 추출하여 세련되게 보여줍니다.
+                </p>
+              </div>
+
+              {/* Feature 3 */}
+              <div className="flex flex-col items-center text-center p-8 rounded-[32px] bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800 transition-all hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-sm">
+                <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center mb-6 text-emerald-600 dark:text-emerald-400">
+                  <IconShare className="w-7 h-7" />
+                </div>
+                <h3 className="font-bold text-xl mb-3 text-zinc-900 dark:text-zinc-100">쉬운 공유</h3>
+                <p className="text-zinc-500 dark:text-zinc-400 text-base leading-relaxed">
+                  인스타그램, 틱톡, 깃허브 등 나만의 채널 어디서든 하나의 링크로 연결하세요.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Footer */}
+        <footer className="w-full py-10 bg-white dark:bg-zinc-900 text-center text-sm text-zinc-400 dark:text-zinc-600 border-t border-zinc-100 dark:border-zinc-800/50">
+          <p>© {new Date().getFullYear()} My-Link. All rights reserved.</p>
+        </footer>
       </div>
     );
   }
