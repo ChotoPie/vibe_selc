@@ -5,8 +5,9 @@ import { LinkCard } from "@/components/LinkCard";
 import { ProfileHeader } from "@/components/ProfileHeader";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { IconShare, IconPlus, IconLogout, IconLink, IconBrandGoogle, IconLayoutDashboard, IconDeviceDesktopAnalytics } from "@tabler/icons-react";
+import { IconShare, IconPlus, IconLogout, IconLink, IconBrandGoogle, IconLayoutDashboard, IconDeviceDesktopAnalytics, IconChartBar } from "@tabler/icons-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +34,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 export default function Page() {
+  const router = useRouter();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -165,9 +167,14 @@ export default function Page() {
           <IconLogout className="w-4 h-4 mr-2" />
           로그아웃
         </Button>
-        <Button variant="ghost" size="icon" className="rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">
-          <IconShare stroke={1.5} className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
-        </Button>
+        <div className="flex gap-1">
+          <Button variant="ghost" size="icon" onClick={() => router.push('/stats')} className="rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors" title="통계 보기">
+            <IconChartBar stroke={1.5} className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
+          </Button>
+          <Button variant="ghost" size="icon" className="rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">
+            <IconShare stroke={1.5} className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
+          </Button>
+        </div>
       </div>
 
       <div className="w-full max-w-xl flex flex-col items-center">
