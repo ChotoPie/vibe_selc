@@ -2,37 +2,31 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { LinkItem } from "@/data/links";
-import { auth, db } from "@/lib/firebase";
-import { collection, addDoc, onSnapshot, serverTimestamp, query, orderBy, where, getDocs } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
-import { Card } from "@/components/ui/card";
+import { auth } from "@/lib/firebase";
+import { onAuthStateChanged, User } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { IconShare, IconPlus, IconLogout } from "@tabler/icons-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { logout, signInWithGoogle } from "@/lib/auth";
-
-// Zod & RHF
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { notFound } from "next/navigation";
+
+// Hooks & Components
+import { useProfileByDisplayName } from "@/hooks/useProfileByDisplayName";
+import { useLinks } from "@/hooks/useLinks";
+import { ProfileHeader } from "@/components/ProfileHeader";
+import { LinkCard } from "@/components/LinkCard";
 
 const formSchema = z.object({
   title: z.string().min(1, { message: "링크 이름을 입력해주세요." }),
   url: z.string().min(1, { message: "URL을 입력해주세요." }).refine((val) => {
-    let domain = "google.com";
     try {
       const url = new URL(val.startsWith('http') ? val : `https://${val}`);
-      domain = url.hostname;
-      return domain.includes('.');
+      return url.hostname.includes('.');
     } catch {
       return false;
     }
@@ -46,114 +40,43 @@ export default function ProfilePage() {
   const router = useRouter();
   const displayName = typeof params?.displayName === "string" ? params.displayName : "";
 
-  const [profileUid, setProfileUid] = useState<string | null>(null);
-  const [profileData, setProfileData] = useState<{ username: string, bio: string } | null>(null);
-  const [links, setLinks] = useState<LinkItem[]>([]);
-  const [isOwner, setIsOwner] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [notFound, setNotFound] = useState(false);
 
   // Zod + RHF Setup
-  const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<FormValues>({
+  const { register, handleSubmit, formState: { errors }, reset } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: { title: "", url: "" },
   });
 
-  // Fetch Profile & Setup Links Listener
-  useEffect(() => {
-    if (!displayName) return;
-
-    const fetchProfile = async () => {
-      const q = query(collection(db, "users"), where("displayName", "==", displayName));
-      const querySnapshot = await getDocs(q);
-      
-      if (querySnapshot.empty) {
-        if (displayName === "anonymous") {
-          // DB에 없어도 볼 수 있는 기본(체험용) 익명 프로필 제공
-          setProfileUid("anonymous");
-          setProfileData({
-            username: "익명 사용자",
-            bio: "이곳은 누구나 구경할 수 있는 체험용 페이지입니다.\n우측 상단의 'Google 로그인'을 눌러 나만의 페이지를 만들어보세요!",
-          });
-          
-          const linksQuery = query(collection(db, "users", "anonymous", "links"), orderBy("createdAt", "asc"));
-          const unsubscribeLinks = onSnapshot(linksQuery, (snapshot) => {
-            const fetchedLinks: LinkItem[] = snapshot.docs.map(doc => ({
-              id: doc.id, title: doc.data().title, url: doc.data().url, icon: doc.data().icon,
-            }));
-            setLinks(fetchedLinks);
-          });
-          return () => unsubscribeLinks();
-        }
-
-        setNotFound(true);
-        return;
-      }
-
-      const userDoc = querySnapshot.docs[0];
-      setProfileUid(userDoc.id);
-      setProfileData({
-        username: userDoc.data().username || displayName,
-        bio: userDoc.data().bio || "아직 소개글이 없습니다.",
-      });
-
-      // Links Listener
-      const linksQuery = query(
-        collection(db, "users", userDoc.id, "links"),
-        orderBy("createdAt", "asc")
-      );
-      
-      const unsubscribeLinks = onSnapshot(linksQuery, (snapshot) => {
-        const fetchedLinks: LinkItem[] = snapshot.docs.map(doc => ({
-          id: doc.id,
-          title: doc.data().title,
-          url: doc.data().url,
-          icon: doc.data().icon,
-        }));
-        setLinks(fetchedLinks);
-      });
-
-      return () => unsubscribeLinks();
-    };
-
-    fetchProfile();
-  }, [displayName]);
-
-  // Auth Listener to check ownership
+  // Auth Listener
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      setIsLoggedIn(!!user);
-      if (user && profileUid && user.uid === profileUid) {
-        setIsOwner(true);
-      } else {
-        setIsOwner(false);
-      }
+      setCurrentUser(user);
+      setIsAuthLoading(false);
     });
     return () => unsubscribeAuth();
-  }, [profileUid]);
+  }, []);
 
-  const onSubmit = async (data: FormValues) => {
+  // Fetch Profile & Links using TanStack Query
+  const { data: profileResult, isLoading: isProfileLoading } = useProfileByDisplayName(displayName);
+  const profileUid = profileResult?.uid;
+  const { links, isLoading: isLinksLoading, addLink, isAdding } = useLinks(profileUid);
+
+  // 본인 여부 확인
+  const isOwner = !!currentUser && !!profileUid && currentUser.uid === profileUid;
+
+  const onSubmit = (data: FormValues) => {
     if (!profileUid || !isOwner) return;
 
     let domain = "google.com";
     const formattedUrl = data.url.startsWith('http') ? data.url : `https://${data.url}`;
-    try {
-      domain = new URL(formattedUrl).hostname;
-    } catch {}
+    try { domain = new URL(formattedUrl).hostname; } catch {}
 
-    try {
-      await addDoc(collection(db, "users", profileUid, "links"), {
-        title: data.title,
-        url: formattedUrl,
-        icon: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
-        createdAt: serverTimestamp()
-      });
-      setIsDialogOpen(false);
-    } catch (error) {
-      console.error("Error adding document: ", error);
-      alert("링크를 추가하는 중 오류가 발생했습니다.");
-    }
+    addLink({ title: data.title, url: formattedUrl, domain });
+    setIsDialogOpen(false);
+    reset();
   };
 
   const handleLogout = async () => {
@@ -170,12 +93,13 @@ export default function ProfilePage() {
     }
   };
 
-  if (notFound) {
-    return <div className="flex min-h-screen items-center justify-center">존재하지 않는 프로필입니다.</div>;
+  // 404 처리 (데이터 페칭 완료 후 유저를 못 찾은 경우)
+  if (!isProfileLoading && profileResult === null) {
+    notFound(); // next/navigation을 통해 404 에러 페이지로 직행
   }
 
-  if (!profileData) {
-    return <div className="flex min-h-screen items-center justify-center">Loading...</div>;
+  if (isAuthLoading || isProfileLoading) {
+    return <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">Loading...</div>;
   }
 
   return (
@@ -189,7 +113,7 @@ export default function ProfilePage() {
             로그아웃
           </Button>
         ) : (
-          !isLoggedIn ? (
+          !currentUser ? (
             <Button variant="outline" size="sm" onClick={handleLogin} className="rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
               Google 로그인
             </Button>
@@ -206,14 +130,9 @@ export default function ProfilePage() {
 
       <div className="w-full max-w-xl flex flex-col items-center">
         {/* 프로필 헤더 영역 */}
-        <div className="flex flex-col items-center text-center space-y-4 mb-10 w-full px-4">
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100">
-            {profileData.username}
-          </h1>
-          <p className="text-zinc-600 dark:text-zinc-400 text-sm sm:text-base max-w-sm whitespace-pre-wrap leading-relaxed font-medium">
-            {profileData.bio}
-          </p>
-        </div>
+        {profileUid && (
+          <ProfileHeader uid={profileUid} isOwner={isOwner} />
+        )}
 
         {/* 링크 목록 영역 */}
         <div className="w-full flex flex-col gap-3">
@@ -222,7 +141,7 @@ export default function ProfilePage() {
           {isOwner && (
             <Dialog open={isDialogOpen} onOpenChange={(open) => {
               setIsDialogOpen(open);
-              if (!open) reset(); // 다이얼로그 닫힐 때 폼 초기화
+              if (!open) reset();
             }}>
               <DialogTrigger asChild>
                 <Button variant="outline" className="w-full h-14 rounded-[20px] border-dashed border-2 border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all">
@@ -234,7 +153,6 @@ export default function ProfilePage() {
                 <DialogHeader>
                   <DialogTitle>새 링크 추가</DialogTitle>
                 </DialogHeader>
-                {/* Zod + RHF Form */}
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
                   <div className="space-y-2">
                     <Label htmlFor="title" className={errors.title ? "text-red-500" : ""}>링크 이름</Label>
@@ -257,8 +175,8 @@ export default function ProfilePage() {
                     {errors.url && <p className="text-sm text-red-500 font-medium">{errors.url.message}</p>}
                   </div>
                   <div className="flex justify-end pt-4">
-                    <Button type="submit" disabled={isSubmitting}>
-                      {isSubmitting ? "추가 중..." : "추가하기"}
+                    <Button type="submit" disabled={isAdding}>
+                      {isAdding ? "추가 중..." : "추가하기"}
                     </Button>
                   </div>
                 </form>
@@ -266,33 +184,25 @@ export default function ProfilePage() {
             </Dialog>
           )}
 
-          {links.map((link) => (
-            <a
-              key={link.id}
-              href={link.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group w-full outline-none block"
-            >
-              <Card className="relative flex items-center p-4 h-[68px] transition-all duration-300 ease-out border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md hover:-translate-y-1 hover:border-zinc-300 dark:hover:border-zinc-700 rounded-[20px] group-focus-visible:ring-2 group-focus-visible:ring-zinc-900 dark:group-focus-visible:ring-zinc-300 cursor-pointer">
-                
-                <div className="absolute left-4 flex-shrink-0 w-11 h-11 flex items-center justify-center bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 rounded-full group-hover:scale-105 transition-transform duration-300">
-                  <img
-                    src={link.icon}
-                    alt={`${link.title} icon`}
-                    className="w-5 h-5 object-contain"
-                  />
-                </div>
-                
-                <div className="w-full flex justify-center px-14">
-                  <span className="font-semibold text-[15px] tracking-tight text-zinc-800 dark:text-zinc-200 truncate">
-                    {link.title}
-                  </span>
-                </div>
-                
-              </Card>
-            </a>
-          ))}
+          {/* 로딩 중일 때 보여줄 스켈레톤 UI */}
+          {isLinksLoading ? (
+            <div className="w-full flex flex-col gap-3 mt-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-[68px] w-full bg-zinc-200 dark:bg-zinc-800/50 animate-pulse rounded-[20px]" />
+              ))}
+            </div>
+          ) : (
+            <div className="mt-2 space-y-3">
+              {links.map((link) => (
+                <LinkCard 
+                  key={link.id} 
+                  link={link} 
+                  isOwner={isOwner} 
+                  profileUid={profileUid!} 
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="mt-16 mb-8 text-zinc-400 dark:text-zinc-600 font-medium text-xs tracking-wider flex items-center gap-1.5 opacity-80 hover:opacity-100 transition-opacity">

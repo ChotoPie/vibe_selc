@@ -7,9 +7,10 @@ import { useProfile, ProfileData } from "@/hooks/useProfile";
 
 interface ProfileHeaderProps {
   uid: string;
+  isOwner?: boolean;
 }
 
-export function ProfileHeader({ uid }: ProfileHeaderProps) {
+export function ProfileHeader({ uid, isOwner = true }: ProfileHeaderProps) {
   const { profile, updateProfile, isLoading } = useProfile(uid);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<ProfileData>({ displayName: "", username: "", bio: "" });
@@ -39,7 +40,11 @@ export function ProfileHeader({ uid }: ProfileHeaderProps) {
     setIsEditing(false);
   };
 
-  if (isEditing) {
+  const handleEditClick = () => {
+    if (isOwner) setIsEditing(true);
+  };
+
+  if (isEditing && isOwner) {
     return (
       <div className="flex flex-col items-center w-full px-4 mb-10 space-y-4 animate-in fade-in zoom-in-95 duration-200">
         <div className="w-full max-w-sm space-y-4 p-6 bg-white dark:bg-zinc-900 rounded-[24px] border border-zinc-200 dark:border-zinc-800 shadow-sm">
@@ -84,38 +89,40 @@ export function ProfileHeader({ uid }: ProfileHeaderProps) {
   }
 
   return (
-    <div className="flex flex-col items-center text-center space-y-3 mb-10 w-full px-4 group relative">
-      <Button 
-        variant="ghost" 
-        size="icon" 
-        onClick={() => setIsEditing(true)}
-        className="absolute -right-2 top-0 opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700"
-      >
-        <IconEdit className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
-      </Button>
+    <div className={`flex flex-col items-center text-center space-y-3 mb-10 w-full px-4 relative ${isOwner ? 'group' : ''}`}>
+      {isOwner && (
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={handleEditClick}
+          className="absolute -right-2 top-0 opacity-0 group-hover:opacity-100 transition-opacity rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+        >
+          <IconEdit className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
+        </Button>
+      )}
 
       <h1 
-        className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100 cursor-pointer hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors" 
-        onClick={() => setIsEditing(true)}
-        title="클릭하여 수정하기"
+        className={`text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100 transition-colors ${isOwner ? 'cursor-pointer hover:text-zinc-600 dark:hover:text-zinc-300' : ''}`} 
+        onClick={handleEditClick}
+        title={isOwner ? "클릭하여 수정하기" : ""}
       >
         {profile.username || "사용자"}
       </h1>
       
       <span 
-        className="text-zinc-600 dark:text-zinc-400 font-bold tracking-wide text-sm bg-zinc-100 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 px-3.5 py-1 rounded-full cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors" 
-        onClick={() => setIsEditing(true)}
-        title="클릭하여 아이디 수정하기"
+        className={`text-zinc-600 dark:text-zinc-400 font-bold tracking-wide text-sm bg-zinc-100 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 px-3.5 py-1 rounded-full transition-colors ${isOwner ? 'cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-700' : ''}`} 
+        onClick={handleEditClick}
+        title={isOwner ? "클릭하여 아이디 수정하기" : ""}
       >
         @{profile.displayName || "id"}
       </span>
 
       <p 
-        className="text-zinc-500 dark:text-zinc-400 text-sm sm:text-base max-w-sm whitespace-pre-wrap leading-relaxed font-medium mt-2 cursor-pointer hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors" 
-        onClick={() => setIsEditing(true)}
-        title="클릭하여 소개글 수정하기"
+        className={`text-zinc-500 dark:text-zinc-400 text-sm sm:text-base max-w-sm whitespace-pre-wrap leading-relaxed font-medium mt-2 transition-colors ${isOwner ? 'cursor-pointer hover:text-zinc-800 dark:hover:text-zinc-200' : ''}`} 
+        onClick={handleEditClick}
+        title={isOwner ? "클릭하여 소개글 수정하기" : ""}
       >
-        {profile.bio || "아직 소개글이 없습니다. 클릭하여 나를 소개해보세요!"}
+        {profile.bio || (isOwner ? "아직 소개글이 없습니다. 클릭하여 나를 소개해보세요!" : "아직 소개글이 없습니다.")}
       </p>
     </div>
   );
