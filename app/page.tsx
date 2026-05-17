@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { dummyLinks, LinkItem } from "@/data/links";
+import { useState, useEffect } from "react";
+import { LinkItem } from "@/data/links";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, onSnapshot, serverTimestamp, query, orderBy } from "firebase/firestore";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { IconShare, IconPlus } from "@tabler/icons-react";
@@ -22,13 +24,36 @@ export default function Page() {
     bio: "프론트엔드 개발자입니다.\n좋은 사용자 경험(UX)을 만드는 데 관심이 많습니다.",
   };
 
-  const [links, setLinks] = useState<LinkItem[]>(dummyLinks);
+  const [links, setLinks] = useState<LinkItem[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newLinkTitle, setNewLinkTitle] = useState("");
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [urlError, setUrlError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleAddLink = (e: React.FormEvent) => {
+  // Firestore 실시간 데이터 조회
+  useEffect(() => {
+    const q = query(
+      collection(db, "users", "anonymous", "links"),
+      orderBy("createdAt", "asc")
+    );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedLinks: LinkItem[] = snapshot.docs.map(doc => ({
+        id: doc.id,
+        title: doc.data().title,
+        url: doc.data().url,
+        icon: doc.data().icon,
+      }));
+      setLinks(fetchedLinks);
+    }, (error) => {
+      console.error("Error fetching links: ", error);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleAddLink = async (e: React.FormEvent) => {
     e.preventDefault();
     setUrlError("");
     if (!newLinkTitle || !newLinkUrl) return;
@@ -51,17 +76,24 @@ export default function Page() {
       return;
     }
 
-    const newLink: LinkItem = {
-      id: crypto.randomUUID(),
-      title: newLinkTitle,
-      url: formattedUrl,
-      icon: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
-    };
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(db, "users", "anonymous", "links"), {
+        title: newLinkTitle,
+        url: formattedUrl,
+        icon: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+        createdAt: serverTimestamp()
+      });
 
-    setLinks([...links, newLink]);
-    setNewLinkTitle("");
-    setNewLinkUrl("");
-    setIsDialogOpen(false);
+      setNewLinkTitle("");
+      setNewLinkUrl("");
+      setIsDialogOpen(false);
+    } catch (error) {
+      console.error("Error adding document: ", error);
+      setUrlError("링크를 추가하는 중 오류가 발생했습니다.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -131,7 +163,9 @@ export default function Page() {
                   {urlError && <p className="text-sm text-red-500 font-medium">{urlError}</p>}
                 </div>
                 <div className="flex justify-end pt-4">
-                  <Button type="submit" disabled={!newLinkTitle || !newLinkUrl}>추가하기</Button>
+                  <Button type="submit" disabled={!newLinkTitle || !newLinkUrl || isSubmitting}>
+                    {isSubmitting ? "추가 중..." : "추가하기"}
+                  </Button>
                 </div>
               </form>
             </DialogContent>
