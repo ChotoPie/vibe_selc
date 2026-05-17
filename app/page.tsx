@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { LinkItem } from "@/data/links";
 import { LinkCard } from "@/components/LinkCard";
+import { ProfileHeader } from "@/components/ProfileHeader";
 import { auth, db } from "@/lib/firebase";
 import { collection, addDoc, serverTimestamp, query, orderBy, getDocs, doc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged, User } from "firebase/auth";
@@ -42,7 +43,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 export default function Page() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [profileData, setProfileData] = useState<{ username: string, bio: string } | null>(null);
+  const [profileData, setProfileData] = useState<{ displayName: string, username: string, bio: string } | null>(null);
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -76,27 +77,31 @@ export default function Page() {
       setCurrentUser(user);
       if (user) {
         setIsLoading(true);
-        try {
-          const userDocRef = doc(db, "users", user.uid);
-          const userDoc = await getDoc(userDocRef);
-          
-          if (userDoc.exists()) {
-            setProfileData({
-              username: userDoc.data().username,
-              bio: userDoc.data().bio || "",
-            });
-          } else {
-            // 회원가입 직후 Race Condition 대응용 Fallback
-            setProfileData({
-              username: user.displayName || user.email?.split('@')[0] || "사용자",
-              bio: "",
-            });
+        const loadProfile = async () => {
+          try {
+            const userDocRef = doc(db, "users", user.uid);
+            const userDoc = await getDoc(userDocRef);
+            
+            if (userDoc.exists()) {
+              setProfileData({
+                displayName: userDoc.data().displayName || user.email?.split('@')[0] || user.uid,
+                username: userDoc.data().username,
+                bio: userDoc.data().bio || "",
+              });
+            } else {
+              setProfileData({
+                displayName: user.email?.split('@')[0] || user.uid,
+                username: user.displayName || user.email?.split('@')[0] || "사용자",
+                bio: "",
+              });
+            }
+          } catch (error) {
+            console.error("Error fetching user profile:", error);
           }
-          await loadLinks(user.uid);
-        } catch (error) {
-          console.error("Error fetching user profile:", error);
-          setIsLoading(false);
-        }
+        };
+
+        await loadProfile();
+        await loadLinks(user.uid);
       } else {
         setIsLoading(false);
         setProfileData(null);
@@ -247,15 +252,23 @@ export default function Page() {
       </div>
 
       <div className="w-full max-w-xl flex flex-col items-center">
-        {/* 프로필 헤더 영역 */}
-        <div className="flex flex-col items-center text-center space-y-4 mb-10 w-full px-4">
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100">
-            {profileData?.username || "사용자"}
-          </h1>
-          <p className="text-zinc-600 dark:text-zinc-400 text-sm sm:text-base max-w-sm whitespace-pre-wrap leading-relaxed font-medium">
-            {profileData?.bio || "아직 소개글이 없습니다."}
-          </p>
-        </div>
+        {/* 프로필 헤더 영역 (인라인 수정 컴포넌트) */}
+        {profileData && (
+          <ProfileHeader 
+            uid={currentUser.uid} 
+            initialData={profileData} 
+            onRefresh={async () => {
+              const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+              if (userDoc.exists()) {
+                setProfileData({
+                  displayName: userDoc.data().displayName,
+                  username: userDoc.data().username,
+                  bio: userDoc.data().bio || "",
+                });
+              }
+            }} 
+          />
+        )}
 
         {/* 링크 목록 영역 */}
         <div className="w-full flex flex-col gap-3">
