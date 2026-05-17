@@ -48,6 +48,7 @@ export default function Page() {
   };
 
   const [links, setLinks] = useState<LinkItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isOwner, setIsOwner] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -72,6 +73,7 @@ export default function Page() {
         icon: doc.data().icon,
       }));
       setLinks(fetchedLinks);
+      setIsLoading(false);
     });
 
     return () => unsubscribeLinks();
@@ -208,14 +210,22 @@ export default function Page() {
             </Dialog>
           )}
 
-          {links.map((link) => (
-            <a
-              key={link.id}
-              href={link.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group w-full outline-none block"
-            >
+          {/* 로딩 중일 때 보여줄 스켈레톤 UI */}
+          {isLoading ? (
+            <div className="w-full flex flex-col gap-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-[68px] w-full bg-zinc-200 dark:bg-zinc-800/50 animate-pulse rounded-[20px]" />
+              ))}
+            </div>
+          ) : (
+            links.map((link) => (
+              <a
+                key={link.id}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group w-full outline-none block"
+              >
               <Card className="relative flex items-center p-4 h-[68px] transition-all duration-300 ease-out border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md hover:-translate-y-1 hover:border-zinc-300 dark:hover:border-zinc-700 rounded-[20px] group-focus-visible:ring-2 group-focus-visible:ring-zinc-900 dark:group-focus-visible:ring-zinc-300 cursor-pointer">
                 
                 <div className="absolute left-4 flex-shrink-0 w-11 h-11 flex items-center justify-center bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 rounded-full group-hover:scale-105 transition-transform duration-300">
@@ -234,7 +244,8 @@ export default function Page() {
                 
               </Card>
             </a>
-          ))}
+            ))
+          )}
         </div>
 
         <div className="mt-16 mb-8 text-zinc-400 dark:text-zinc-600 font-medium text-xs tracking-wider flex items-center gap-1.5 opacity-80 hover:opacity-100 transition-opacity">
