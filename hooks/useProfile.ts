@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 export interface ProfileData {
@@ -11,7 +11,7 @@ export interface ProfileData {
 export function useProfile(uid: string | undefined) {
   const queryClient = useQueryClient();
 
-  const query = useQuery({
+  const profileQuery = useQuery({
     queryKey: ["profile", uid],
     queryFn: async (): Promise<ProfileData | null> => {
       if (!uid) return null;
@@ -32,6 +32,16 @@ export function useProfile(uid: string | undefined) {
   const updateMutation = useMutation({
     mutationFn: async (newData: ProfileData) => {
       if (!uid) throw new Error("No user ID");
+
+      // displayName 중복 검사
+      const q = query(collection(db, "users"), where("displayName", "==", newData.displayName));
+      const snapshot = await getDocs(q);
+      const isDuplicate = !snapshot.empty && snapshot.docs.some(d => d.id !== uid);
+      
+      if (isDuplicate) {
+        throw new Error("이미 사용 중인 아이디입니다.");
+      }
+
       await updateDoc(doc(db, "users", uid), {
         displayName: newData.displayName,
         username: newData.username,
@@ -63,8 +73,8 @@ export function useProfile(uid: string | undefined) {
   });
 
   return {
-    profile: query.data,
-    isLoading: query.isLoading,
+    profile: profileQuery.data,
+    isLoading: profileQuery.isLoading,
     updateProfile: updateMutation.mutate,
   };
 }

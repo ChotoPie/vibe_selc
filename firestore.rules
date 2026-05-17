@@ -1,0 +1,26 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. 유저 프로필 문서 (users/{userId})
+    // displayName, username, bio 등의 데이터가 저장되는 경로입니다.
+    match /users/{userId} {
+      // 읽기: 공개 프로필 페이지( /[displayName] ) 조회를 위해 누구나 접근 가능해야 함
+      allow read: if true;
+      
+      // 쓰기(생성/수정/삭제): 로그인이 되어 있고, 요청하는 UID가 문서의 ID(userId)와 일치할 때만 허용
+      allow write: if request.auth != null && request.auth.uid == userId;
+      
+      // 2. 링크 서브 컬렉션 (users/{userId}/links/{linkId})
+      match /links/{linkId} {
+        // 읽기: 누구나 대상 유저의 링크 목록을 볼 수 있음
+        allow read: if true;
+        
+        // 쓰기: 본인의 링크만 추가, 수정, 삭제 가능
+        allow write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+    
+  }
+}

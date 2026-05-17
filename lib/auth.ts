@@ -1,8 +1,27 @@
 import { auth, db } from "@/lib/firebase";
 import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
 
 const googleProvider = new GoogleAuthProvider();
+
+// 고유한 displayName을 생성하는 헬퍼 함수
+async function getUniqueDisplayName(baseName: string): Promise<string> {
+  let displayName = baseName;
+  let isUnique = false;
+  let counter = 0;
+
+  while (!isUnique) {
+    const q = query(collection(db, "users"), where("displayName", "==", displayName));
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) {
+      isUnique = true;
+    } else {
+      counter++;
+      displayName = `${baseName}${counter}`;
+    }
+  }
+  return displayName;
+}
 
 export const signInWithGoogle = async () => {
   try {
@@ -13,9 +32,11 @@ export const signInWithGoogle = async () => {
     const userDocRef = doc(db, "users", user.uid);
     const userDoc = await getDoc(userDocRef);
 
-    let displayName = user.email ? user.email.split('@')[0] : user.uid;
+    let baseDisplayName = user.email ? user.email.split('@')[0] : user.uid.substring(0, 8);
+    let displayName = baseDisplayName;
 
     if (!userDoc.exists()) {
+      displayName = await getUniqueDisplayName(baseDisplayName);
       // Create new user profile
       await setDoc(userDocRef, {
         displayName: displayName,
@@ -24,7 +45,14 @@ export const signInWithGoogle = async () => {
         createdAt: new Date(),
       });
     } else {
-      displayName = userDoc.data()?.displayName || displayName;
+      const data = userDoc.data();
+      if (!data?.displayName) {
+        displayName = await getUniqueDisplayName(baseDisplayName);
+        // 기존 유저인데 displayName 필드가 누락된 경우 백필(Backfill)
+        await setDoc(userDocRef, { displayName: displayName }, { merge: true });
+      } else {
+        displayName = data.displayName;
+      }
     }
 
     return { user, displayName };

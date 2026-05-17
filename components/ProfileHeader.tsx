@@ -31,8 +31,12 @@ export function ProfileHeader({ uid, isOwner = true }: ProfileHeaderProps) {
   }
 
   const handleSave = () => {
-    updateProfile(formData);
-    setIsEditing(false); // 낙관적 업데이트로 즉시 모드 전환
+    updateProfile(formData, {
+      onError: (error) => {
+        alert(error.message);
+      }
+    });
+    setIsEditing(false); // 에러가 나면 캐시 롤백에 의해 폼도 이전 값으로 돌아감
   };
 
   const handleCancel = () => {
