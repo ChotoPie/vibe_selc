@@ -5,7 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { Button } from "@/components/ui/button";
-import { IconShare, IconPlus, IconLogout } from "@tabler/icons-react";
+import { IconShare, IconPlus, IconLogout, IconUser, IconChartBar } from "@tabler/icons-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -93,6 +95,15 @@ export default function ProfilePage() {
     }
   };
 
+  const handleShare = () => {
+    const url = `${window.location.origin}/${displayName}`;
+    navigator.clipboard.writeText(url).then(() => {
+      alert("공유 링크가 클립보드에 복사되었습니다!");
+    }).catch(() => {
+      alert("링크 복사에 실패했습니다.");
+    });
+  };
+
   // 404 처리 (데이터 페칭 완료 후 유저를 못 찾은 경우)
   if (!isProfileLoading && profileResult === null) {
     notFound(); // next/navigation을 통해 404 에러 페이지로 직행
@@ -106,12 +117,44 @@ export default function ProfilePage() {
     <div className="flex min-h-screen flex-col items-center p-6 bg-zinc-50 dark:bg-zinc-950 text-foreground selection:bg-zinc-200 dark:selection:bg-zinc-800 font-sans">
       
       {/* 상단 액션 바 */}
-      <div className="w-full max-w-xl flex justify-between mb-8 mt-2">
-        {isOwner ? (
-          <Button variant="ghost" size="sm" onClick={handleLogout} className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200">
-            <IconLogout className="w-4 h-4 mr-2" />
-            로그아웃
-          </Button>
+      <div className="w-full max-w-xl flex justify-between mb-8 mt-2 items-center">
+        {isOwner && currentUser ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="relative h-10 w-10 rounded-full border border-zinc-200 dark:border-zinc-800 p-0 overflow-hidden hover:opacity-80 transition-opacity">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={currentUser.photoURL || undefined} alt={profileResult?.profile?.username || currentUser.email || ""} />
+                  <AvatarFallback className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+                    {(profileResult?.profile?.username || currentUser.email || "?").charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="start" forceMount>
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">{profileResult?.profile?.username || "사용자"}</p>
+                  <p className="text-xs leading-none text-zinc-500 dark:text-zinc-400">
+                    {currentUser.email}
+                  </p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="cursor-pointer" onClick={() => router.push('/')}>
+                <IconUser className="mr-2 h-4 w-4" />
+                <span>내 대시보드 관리</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer" onClick={() => router.push('/stats')}>
+                <IconChartBar className="mr-2 h-4 w-4" />
+                <span>통계 대시보드</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400" onClick={handleLogout}>
+                <IconLogout className="mr-2 h-4 w-4" />
+                <span>로그아웃</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : (
           !currentUser ? (
             <Button variant="outline" size="sm" onClick={handleLogin} className="rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
@@ -119,11 +162,11 @@ export default function ProfilePage() {
             </Button>
           ) : (
             <Button variant="outline" size="sm" onClick={() => router.push('/')} className="rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
-              내 프로필 이동
+              내 대시보드로 이동
             </Button>
           )
         )}
-        <Button variant="ghost" size="icon" className="rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">
+        <Button variant="ghost" size="icon" onClick={handleShare} className="rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors" title="이 페이지 공유하기">
           <IconShare stroke={1.5} className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
         </Button>
       </div>
