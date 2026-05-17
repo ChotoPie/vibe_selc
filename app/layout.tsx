@@ -12,6 +12,12 @@ const fontMono = Geist_Mono({
   variable: "--font-mono",
 })
 
+export const metadata = {
+  title: "My-Link",
+  description: "단 하나의 멀티 링크 서비스",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://vibe-selc.vercel.app'),
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
