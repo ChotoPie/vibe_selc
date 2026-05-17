@@ -7,7 +7,9 @@ import { auth } from "@/lib/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { IconShare, IconPlus, IconLogout, IconLink, IconBrandGoogle, IconLayoutDashboard, IconDeviceDesktopAnalytics, IconChartBar } from "@tabler/icons-react";
+import { IconShare, IconPlus, IconLogout, IconLink, IconBrandGoogle, IconLayoutDashboard, IconDeviceDesktopAnalytics, IconChartBar, IconUser } from "@tabler/icons-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +18,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useLinks } from "@/hooks/useLinks";
+import { useProfile } from "@/hooks/useProfile";
 
 const formSchema = z.object({
   title: z.string().min(1, { message: "링크 이름을 입력해주세요." }),
@@ -66,6 +69,21 @@ export default function Page() {
   };
 
   const handleLogout = async () => { await logout(); };
+
+  const { profile } = useProfile(currentUser?.uid);
+
+  const handleShare = () => {
+    if (!profile?.displayName) {
+      alert("프로필 정보가 아직 로드되지 않았습니다.");
+      return;
+    }
+    const url = `${window.location.origin}/${profile.displayName}`;
+    navigator.clipboard.writeText(url).then(() => {
+      alert("공유 링크가 클립보드에 복사되었습니다!");
+    }).catch(() => {
+      alert("링크 복사에 실패했습니다.");
+    });
+  };
 
   const handleLogin = async () => {
     try {
@@ -162,19 +180,49 @@ export default function Page() {
     <div className="flex min-h-screen flex-col items-center p-6 bg-zinc-50 dark:bg-zinc-950 text-foreground selection:bg-zinc-200 dark:selection:bg-zinc-800 font-sans">
       
       {/* 상단 액션 바 */}
-      <div className="w-full max-w-xl flex justify-between mb-8 mt-2">
-        <Button variant="ghost" size="sm" onClick={handleLogout} className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200">
-          <IconLogout className="w-4 h-4 mr-2" />
-          로그아웃
+      <div className="w-full max-w-xl flex justify-between mb-8 mt-2 items-center">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="relative h-10 w-10 rounded-full border border-zinc-200 dark:border-zinc-800 p-0 overflow-hidden hover:opacity-80 transition-opacity">
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={currentUser.photoURL || undefined} alt={profile?.username || currentUser.email || ""} />
+                <AvatarFallback className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+                  {(profile?.username || currentUser.email || "?").charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56" align="start" forceMount>
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium leading-none">{profile?.username || "사용자"}</p>
+                <p className="text-xs leading-none text-zinc-500 dark:text-zinc-400">
+                  {currentUser.email}
+                </p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="cursor-pointer" onClick={() => {
+              if (profile?.displayName) window.open(`/${profile.displayName}`, '_blank');
+            }}>
+              <IconUser className="mr-2 h-4 w-4" />
+              <span>내 프로필 보기</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem className="cursor-pointer" onClick={() => router.push('/stats')}>
+              <IconChartBar className="mr-2 h-4 w-4" />
+              <span>통계 대시보드</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400" onClick={handleLogout}>
+              <IconLogout className="mr-2 h-4 w-4" />
+              <span>로그아웃</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <Button variant="ghost" size="icon" onClick={handleShare} className="rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors" title="내 페이지 공유하기">
+          <IconShare stroke={1.5} className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
         </Button>
-        <div className="flex gap-1">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/stats')} className="rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors" title="통계 보기">
-            <IconChartBar stroke={1.5} className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
-          </Button>
-          <Button variant="ghost" size="icon" className="rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">
-            <IconShare stroke={1.5} className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
-          </Button>
-        </div>
       </div>
 
       <div className="w-full max-w-xl flex flex-col items-center">
