@@ -1,5 +1,5 @@
 import { auth, db } from "@/lib/firebase";
-import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, User } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, signOut, User } from "firebase/auth";
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
 
 const googleProvider = new GoogleAuthProvider();
@@ -56,27 +56,8 @@ export const signInWithGoogle = async () => {
     const result = await signInWithPopup(auth, googleProvider);
     const displayName = await syncUserProfile(result.user);
     return { user: result.user, displayName };
-  } catch (error: any) {
-    if (error.code === 'auth/popup-blocked') {
-      console.warn("Popup blocked. Falling back to redirect...");
-      await signInWithRedirect(auth, googleProvider);
-    } else {
-      console.error("Error signing in with Google: ", error);
-      throw error;
-    }
-  }
-};
-
-export const handleAuthRedirect = async () => {
-  try {
-    const result = await getRedirectResult(auth);
-    if (result?.user) {
-      const displayName = await syncUserProfile(result.user);
-      return { user: result.user, displayName };
-    }
-    return null;
   } catch (error) {
-    console.error("Error handling redirect result: ", error);
+    console.error("Error signing in with Google: ", error);
     throw error;
   }
 };

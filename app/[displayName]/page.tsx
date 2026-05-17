@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { logout, signInWithGoogle, handleAuthRedirect } from "@/lib/auth";
+import { logout, signInWithGoogle } from "@/lib/auth";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -54,14 +54,6 @@ export default function ProfilePage() {
 
   // Auth Listener
   useEffect(() => {
-    // 리다이렉트 로그인 결과 처리
-    handleAuthRedirect().then((result) => {
-      if (result) {
-        // 리다이렉트로 로그인 성공 시 본인 프로필 페이지로 이동
-        router.push(`/${result.displayName}`);
-      }
-    }).catch(console.error);
-
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       setIsAuthLoading(false);
