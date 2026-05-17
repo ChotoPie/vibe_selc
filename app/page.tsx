@@ -14,20 +14,20 @@ export default function LandingPage() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
+      if (user && isLoading) {
         try {
           const userDocRef = doc(db, "users", user.uid);
           const userDoc = await getDoc(userDocRef);
           if (userDoc.exists()) {
             router.push(`/${userDoc.data().displayName}`);
           } else {
-            const emailPrefix = user.email ? user.email.split('@')[0] : user.uid;
-            router.push(`/${emailPrefix}`);
+            // 문서가 아직 없다면, 수동 로그인(handleLogin)이 처리 중이므로 대기
+            setIsLoading(false);
           }
         } catch (error) {
           setIsLoading(false);
         }
-      } else {
+      } else if (!user) {
         setIsLoading(false);
       }
     });

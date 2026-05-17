@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { logout } from "@/lib/auth";
+import { logout, signInWithGoogle } from "@/lib/auth";
 
 // Zod & RHF
 import { z } from "zod";
@@ -50,6 +50,7 @@ export default function ProfilePage() {
   const [profileData, setProfileData] = useState<{ username: string, bio: string } | null>(null);
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [isOwner, setIsOwner] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [notFound, setNotFound] = useState(false);
 
@@ -104,6 +105,7 @@ export default function ProfilePage() {
   // Auth Listener to check ownership
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      setIsLoggedIn(!!user);
       if (user && profileUid && user.uid === profileUid) {
         setIsOwner(true);
       } else {
@@ -141,6 +143,15 @@ export default function ProfilePage() {
     router.push("/");
   };
 
+  const handleLogin = async () => {
+    try {
+      const { displayName: myDisplayName } = await signInWithGoogle();
+      router.push(`/${myDisplayName}`);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   if (notFound) {
     return <div className="flex min-h-screen items-center justify-center">존재하지 않는 프로필입니다.</div>;
   }
@@ -159,7 +170,17 @@ export default function ProfilePage() {
             <IconLogout className="w-4 h-4 mr-2" />
             로그아웃
           </Button>
-        ) : <div />}
+        ) : (
+          !isLoggedIn ? (
+            <Button variant="outline" size="sm" onClick={handleLogin} className="rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+              Google 로그인
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => router.push('/')} className="rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+              내 프로필 이동
+            </Button>
+          )
+        )}
         <Button variant="ghost" size="icon" className="rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">
           <IconShare stroke={1.5} className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
         </Button>
