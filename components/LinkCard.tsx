@@ -33,9 +33,10 @@ type FormValues = z.infer<typeof formSchema>;
 interface LinkCardProps {
   link: LinkItem;
   isOwner: boolean;
+  onRefresh: () => void;
 }
 
-export function LinkCard({ link, isOwner }: LinkCardProps) {
+export function LinkCard({ link, isOwner, onRefresh }: LinkCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -59,6 +60,7 @@ export function LinkCard({ link, isOwner }: LinkCardProps) {
         icon: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
       });
       setIsEditing(false);
+      onRefresh(); // 수정 완료 후 목록 갱신
     } catch (error) {
       console.error("Error updating document: ", error);
       alert("링크 수정 중 오류가 발생했습니다.");
@@ -70,6 +72,7 @@ export function LinkCard({ link, isOwner }: LinkCardProps) {
       setIsDeleting(true);
       await deleteDoc(doc(db, "users", "anonymous", "links", link.id));
       setIsDeleteDialogOpen(false);
+      onRefresh(); // 삭제 완료 후 목록 갱신
     } catch (error) {
       console.error("Error deleting document: ", error);
       alert("링크 삭제 중 오류가 발생했습니다.");

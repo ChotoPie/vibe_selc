@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { LinkItem } from "@/data/links";
 import { LinkCard } from "@/components/LinkCard";
 import { auth, db } from "@/lib/firebase";
-import { collection, addDoc, onSnapshot, serverTimestamp, query, orderBy } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, orderBy, getDocs } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { IconShare, IconPlus, IconLogout } from "@tabler/icons-react";
@@ -58,14 +58,11 @@ export default function Page() {
     defaultValues: { title: "", url: "" },
   });
 
-  // 링크 조회: 기존에 저장하시던 'users/anonymous/links' 경로 유지
-  useEffect(() => {
-    const linksQuery = query(
-      collection(db, "users", "anonymous", "links"),
-      orderBy("createdAt", "asc")
-    );
-    
-    const unsubscribeLinks = onSnapshot(linksQuery, (snapshot) => {
+  const loadLinks = async () => {
+    setIsLoading(true);
+    try {
+      const linksQuery = query(collection(db, "users", "anonymous", "links"), orderBy("createdAt", "asc"));
+      const snapshot = await getDocs(linksQuery);
       const fetchedLinks: LinkItem[] = snapshot.docs.map(doc => ({
         id: doc.id,
         title: doc.data().title,
@@ -73,10 +70,15 @@ export default function Page() {
         icon: doc.data().icon,
       }));
       setLinks(fetchedLinks);
+    } catch (error) {
+      console.error("Error fetching links: ", error);
+    } finally {
       setIsLoading(false);
-    });
+    }
+  };
 
-    return () => unsubscribeLinks();
+  useEffect(() => {
+    loadLinks();
   }, []);
 
   // 로그인 상태 확인 (로그인한 사람이면 일단 추가 버튼을 볼 수 있게 처리)
@@ -110,6 +112,7 @@ export default function Page() {
       });
       setIsDialogOpen(false);
       reset();
+      loadLinks(); // 추가 완료 후 데이터 새로고침
     } catch (error) {
       console.error("Error adding document: ", error);
       alert("링크를 추가하는 중 오류가 발생했습니다.");
@@ -219,7 +222,7 @@ export default function Page() {
             </div>
           ) : (
             links.map((link) => (
-              <LinkCard key={link.id} link={link} isOwner={isOwner} />
+              <LinkCard key={link.id} link={link} isOwner={isOwner} onRefresh={loadLinks} />
             ))
           )}
         </div>
