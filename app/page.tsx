@@ -1,29 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LinkItem } from "@/data/links";
 import { LinkCard } from "@/components/LinkCard";
 import { ProfileHeader } from "@/components/ProfileHeader";
-import { auth, db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, query, orderBy, getDocs, doc, getDoc } from "firebase/firestore";
+import { auth } from "@/lib/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { IconShare, IconPlus, IconLogout, IconLink, IconBrandGoogle, IconLayoutDashboard, IconDeviceDesktopAnalytics } from "@tabler/icons-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { logout, signInWithGoogle } from "@/lib/auth";
-
-// Zod & RHF
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useLinks } from "@/hooks/useLinks";
 
 const formSchema = z.object({
   title: z.string().min(1, { message: "링크 이름을 입력해주세요." }),
@@ -43,116 +34,49 @@ type FormValues = z.infer<typeof formSchema>;
 
 export default function Page() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [profileData, setProfileData] = useState<{ displayName: string, username: string, bio: string } | null>(null);
-  const [links, setLinks] = useState<LinkItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<FormValues>({
+  const { register, handleSubmit, formState: { errors }, reset } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: { title: "", url: "" },
   });
 
-  const loadLinks = async (uid: string) => {
-    setIsLoading(true);
-    try {
-      const linksQuery = query(collection(db, "users", uid, "links"), orderBy("createdAt", "asc"));
-      const snapshot = await getDocs(linksQuery);
-      const fetchedLinks: LinkItem[] = snapshot.docs.map(doc => ({
-        id: doc.id,
-        title: doc.data().title,
-        url: doc.data().url,
-        icon: doc.data().icon,
-      }));
-      setLinks(fetchedLinks);
-    } catch (error) {
-      console.error("Error fetching links: ", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
-      if (user) {
-        setIsLoading(true);
-        const loadProfile = async () => {
-          try {
-            const userDocRef = doc(db, "users", user.uid);
-            const userDoc = await getDoc(userDocRef);
-            
-            if (userDoc.exists()) {
-              setProfileData({
-                displayName: userDoc.data().displayName || user.email?.split('@')[0] || user.uid,
-                username: userDoc.data().username,
-                bio: userDoc.data().bio || "",
-              });
-            } else {
-              setProfileData({
-                displayName: user.email?.split('@')[0] || user.uid,
-                username: user.displayName || user.email?.split('@')[0] || "사용자",
-                bio: "",
-              });
-            }
-          } catch (error) {
-            console.error("Error fetching user profile:", error);
-          }
-        };
-
-        await loadProfile();
-        await loadLinks(user.uid);
-      } else {
-        setIsLoading(false);
-        setProfileData(null);
-        setLinks([]);
-      }
+      setIsAuthLoading(false);
     });
     return () => unsubscribeAuth();
   }, []);
 
-  const onSubmit = async (data: FormValues) => {
-    if (!currentUser) return;
+  const { links, isLoading: isLinksLoading, addLink, isAdding } = useLinks(currentUser?.uid);
 
+  const onSubmit = (data: FormValues) => {
+    if (!currentUser) return;
     let domain = "google.com";
     const formattedUrl = data.url.startsWith('http') ? data.url : `https://${data.url}`;
-    try {
-      domain = new URL(formattedUrl).hostname;
-    } catch {}
+    try { domain = new URL(formattedUrl).hostname; } catch {}
 
-    try {
-      await addDoc(collection(db, "users", currentUser.uid, "links"), {
-        title: data.title,
-        url: formattedUrl,
-        icon: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
-        createdAt: serverTimestamp()
-      });
-      setIsDialogOpen(false);
-      reset();
-      loadLinks(currentUser.uid); // 추가 완료 후 데이터 새로고침
-    } catch (error) {
-      console.error("Error adding document: ", error);
-      alert("링크를 추가하는 중 오류가 발생했습니다.");
-    }
+    addLink({ title: data.title, url: formattedUrl, domain });
+    setIsDialogOpen(false); // 낙관적 업데이트로 로딩 대기 없이 즉시 닫기
+    reset();
   };
 
-  const handleLogout = async () => {
-    await logout();
-  };
+  const handleLogout = async () => { await logout(); };
 
   const handleLogin = async () => {
     try {
-      setIsLoading(true);
+      setIsAuthLoading(true);
       await signInWithGoogle();
-      // onAuthStateChanged가 후속 처리를 담당합니다.
     } catch (error) {
       console.error(error);
-      setIsLoading(false);
+      setIsAuthLoading(false);
     }
   };
 
-  if (isLoading && !currentUser) {
-    return <div className="flex min-h-screen items-center justify-center">Loading...</div>;
+  if (isAuthLoading) {
+    return <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">Loading...</div>;
   }
 
   // 비로그인 상태 (랜딩 및 안내 화면)
@@ -161,7 +85,6 @@ export default function Page() {
       <div className="flex flex-col min-h-screen bg-zinc-50 dark:bg-zinc-950 text-foreground font-sans selection:bg-zinc-200 dark:selection:bg-zinc-800">
         {/* 헤더/히어로 영역 */}
         <div className="flex flex-col items-center justify-center flex-grow p-6 relative overflow-hidden min-h-[70vh]">
-          {/* 장식용 배경 그라데이션 */}
           <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/20 dark:bg-blue-500/10 rounded-full blur-[100px] pointer-events-none" />
           <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/20 dark:bg-purple-500/10 rounded-full blur-[100px] pointer-events-none" />
           
@@ -192,7 +115,6 @@ export default function Page() {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {/* Feature 1 */}
               <div className="flex flex-col items-center text-center p-8 rounded-[32px] bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800 transition-all hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-sm">
                 <div className="w-14 h-14 rounded-full bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center mb-6 text-blue-600 dark:text-blue-400">
                   <IconLayoutDashboard className="w-7 h-7" />
@@ -203,7 +125,6 @@ export default function Page() {
                 </p>
               </div>
 
-              {/* Feature 2 */}
               <div className="flex flex-col items-center text-center p-8 rounded-[32px] bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800 transition-all hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-sm">
                 <div className="w-14 h-14 rounded-full bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center mb-6 text-purple-600 dark:text-purple-400">
                   <IconDeviceDesktopAnalytics className="w-7 h-7" />
@@ -214,7 +135,6 @@ export default function Page() {
                 </p>
               </div>
 
-              {/* Feature 3 */}
               <div className="flex flex-col items-center text-center p-8 rounded-[32px] bg-zinc-50 dark:bg-zinc-950/50 border border-zinc-100 dark:border-zinc-800 transition-all hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-sm">
                 <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center mb-6 text-emerald-600 dark:text-emerald-400">
                   <IconShare className="w-7 h-7" />
@@ -228,7 +148,6 @@ export default function Page() {
           </div>
         </div>
         
-        {/* Footer */}
         <footer className="w-full py-10 bg-white dark:bg-zinc-900 text-center text-sm text-zinc-400 dark:text-zinc-600 border-t border-zinc-100 dark:border-zinc-800/50">
           <p>© {new Date().getFullYear()} My-Link. All rights reserved.</p>
         </footer>
@@ -253,29 +172,13 @@ export default function Page() {
 
       <div className="w-full max-w-xl flex flex-col items-center">
         {/* 프로필 헤더 영역 (인라인 수정 컴포넌트) */}
-        {profileData && (
-          <ProfileHeader 
-            uid={currentUser.uid} 
-            initialData={profileData} 
-            onRefresh={async () => {
-              const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-              if (userDoc.exists()) {
-                setProfileData({
-                  displayName: userDoc.data().displayName,
-                  username: userDoc.data().username,
-                  bio: userDoc.data().bio || "",
-                });
-              }
-            }} 
-          />
-        )}
+        <ProfileHeader uid={currentUser.uid} />
 
         {/* 링크 목록 영역 */}
         <div className="w-full flex flex-col gap-3">
-          
           <Dialog open={isDialogOpen} onOpenChange={(open) => {
             setIsDialogOpen(open);
-            if (!open) reset(); // 다이얼로그 닫힐 때 폼 초기화
+            if (!open) reset();
           }}>
             <DialogTrigger asChild>
               <Button variant="outline" className="w-full h-14 rounded-[20px] border-dashed border-2 border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all">
@@ -287,7 +190,6 @@ export default function Page() {
               <DialogHeader>
                 <DialogTitle>새 링크 추가</DialogTitle>
               </DialogHeader>
-              {/* Zod + RHF Form */}
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
                 <div className="space-y-2">
                   <Label htmlFor="title" className={errors.title ? "text-red-500" : ""}>링크 이름</Label>
@@ -310,8 +212,8 @@ export default function Page() {
                   {errors.url && <p className="text-sm text-red-500 font-medium">{errors.url.message}</p>}
                 </div>
                 <div className="flex justify-end pt-4">
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? "추가 중..." : "추가하기"}
+                  <Button type="submit" disabled={isAdding}>
+                    {isAdding ? "추가 중..." : "추가하기"}
                   </Button>
                 </div>
               </form>
@@ -319,16 +221,18 @@ export default function Page() {
           </Dialog>
 
           {/* 로딩 중일 때 보여줄 스켈레톤 UI */}
-          {isLoading ? (
-            <div className="w-full flex flex-col gap-3">
+          {isLinksLoading ? (
+            <div className="w-full flex flex-col gap-3 mt-2">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="h-[68px] w-full bg-zinc-200 dark:bg-zinc-800/50 animate-pulse rounded-[20px]" />
               ))}
             </div>
           ) : (
-            links.map((link) => (
-              <LinkCard key={link.id} link={link} isOwner={true} profileUid={currentUser.uid} onRefresh={() => loadLinks(currentUser.uid)} />
-            ))
+            <div className="mt-2 space-y-3">
+              {links.map((link) => (
+                <LinkCard key={link.id} link={link} isOwner={true} profileUid={currentUser.uid} />
+              ))}
+            </div>
           )}
         </div>
 

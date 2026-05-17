@@ -1,53 +1,41 @@
 import { useState, useEffect } from "react";
-import { doc, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { IconEdit, IconCheck, IconX } from "@tabler/icons-react";
-
-interface ProfileData {
-  displayName: string;
-  username: string;
-  bio: string;
-}
+import { useProfile, ProfileData } from "@/hooks/useProfile";
 
 interface ProfileHeaderProps {
   uid: string;
-  initialData: ProfileData;
-  onRefresh: () => void;
 }
 
-export function ProfileHeader({ uid, initialData, onRefresh }: ProfileHeaderProps) {
+export function ProfileHeader({ uid }: ProfileHeaderProps) {
+  const { profile, updateProfile, isLoading } = useProfile(uid);
   const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [formData, setFormData] = useState<ProfileData>(initialData);
+  const [formData, setFormData] = useState<ProfileData>({ displayName: "", username: "", bio: "" });
 
-  // 초기 데이터가 변경되면 폼 데이터도 동기화
+  // 캐시된 프로필 데이터가 들어오면 로컬 폼 상태 동기화
   useEffect(() => {
-    setFormData(initialData);
-  }, [initialData]);
+    if (profile) setFormData(profile);
+  }, [profile]);
 
-  const handleSave = async () => {
-    try {
-      setIsSaving(true);
-      await updateDoc(doc(db, "users", uid), {
-        displayName: formData.displayName,
-        username: formData.username,
-        bio: formData.bio,
-      });
-      setIsEditing(false);
-      onRefresh(); // 부모 컴포넌트의 데이터 다시 불러오기
-    } catch (error) {
-      console.error("Error updating profile: ", error);
-      alert("프로필 수정 중 오류가 발생했습니다.");
-    } finally {
-      setIsSaving(false);
-    }
+  if (isLoading || !profile) {
+    return (
+      <div className="flex flex-col items-center space-y-4 mb-10 w-full px-4 animate-pulse">
+        <div className="h-8 w-40 bg-zinc-200 dark:bg-zinc-800 rounded-lg"></div>
+        <div className="h-6 w-24 bg-zinc-200 dark:bg-zinc-800 rounded-full"></div>
+        <div className="h-16 w-64 bg-zinc-200 dark:bg-zinc-800 rounded-lg"></div>
+      </div>
+    );
+  }
+
+  const handleSave = () => {
+    updateProfile(formData);
+    setIsEditing(false); // 낙관적 업데이트로 즉시 모드 전환
   };
 
   const handleCancel = () => {
-    setFormData(initialData); // 변경 사항 초기화
+    setFormData(profile); // 변경 사항 초기화
     setIsEditing(false);
   };
 
@@ -83,11 +71,11 @@ export function ProfileHeader({ uid, initialData, onRefresh }: ProfileHeaderProp
             />
           </div>
           <div className="flex gap-2 pt-2">
-            <Button variant="outline" className="flex-1 rounded-[16px]" onClick={handleCancel} disabled={isSaving}>
+            <Button variant="outline" className="flex-1 rounded-[16px]" onClick={handleCancel}>
               <IconX className="w-4 h-4 mr-1" /> 취소
             </Button>
-            <Button className="flex-1 rounded-[16px]" onClick={handleSave} disabled={isSaving}>
-              <IconCheck className="w-4 h-4 mr-1" /> {isSaving ? "저장 중..." : "저장"}
+            <Button className="flex-1 rounded-[16px]" onClick={handleSave}>
+              <IconCheck className="w-4 h-4 mr-1" /> 저장
             </Button>
           </div>
         </div>
@@ -111,7 +99,7 @@ export function ProfileHeader({ uid, initialData, onRefresh }: ProfileHeaderProp
         onClick={() => setIsEditing(true)}
         title="클릭하여 수정하기"
       >
-        {initialData.username}
+        {profile.username || "사용자"}
       </h1>
       
       <span 
@@ -119,7 +107,7 @@ export function ProfileHeader({ uid, initialData, onRefresh }: ProfileHeaderProp
         onClick={() => setIsEditing(true)}
         title="클릭하여 아이디 수정하기"
       >
-        @{initialData.displayName}
+        @{profile.displayName || "id"}
       </span>
 
       <p 
@@ -127,7 +115,7 @@ export function ProfileHeader({ uid, initialData, onRefresh }: ProfileHeaderProp
         onClick={() => setIsEditing(true)}
         title="클릭하여 소개글 수정하기"
       >
-        {initialData.bio || "아직 소개글이 없습니다. 클릭하여 나를 소개해보세요!"}
+        {profile.bio || "아직 소개글이 없습니다. 클릭하여 나를 소개해보세요!"}
       </p>
     </div>
   );

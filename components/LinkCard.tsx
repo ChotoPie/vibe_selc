@@ -1,27 +1,21 @@
-"use client";
-
 import { useState } from "react";
 import { LinkItem } from "@/data/links";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { IconTrash, IconEdit, IconCheck, IconX } from "@tabler/icons-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { db } from "@/lib/firebase";
-import { doc, updateDoc, deleteDoc } from "firebase/firestore";
-import { z } from "zod";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { IconTrash, IconEdit, IconCheck, IconX, IconAlertCircle } from "@tabler/icons-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useLinks } from "@/hooks/useLinks";
 
 const formSchema = z.object({
   title: z.string().min(1, { message: "링크 이름을 입력해주세요." }),
   url: z.string().min(1, { message: "URL을 입력해주세요." }).refine((val) => {
-    let domain = "google.com";
     try {
       const url = new URL(val.startsWith('http') ? val : `https://${val}`);
-      domain = url.hostname;
-      return domain.includes('.');
+      return url.hostname.includes('.');
     } catch {
       return false;
     }
@@ -34,86 +28,58 @@ interface LinkCardProps {
   link: LinkItem;
   isOwner: boolean;
   profileUid: string;
-  onRefresh: () => void;
 }
 
-export function LinkCard({ link, isOwner, profileUid, onRefresh }: LinkCardProps) {
+export function LinkCard({ link, isOwner, profileUid }: LinkCardProps) {
+  const { updateLink, deleteLink } = useLinks(profileUid);
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<FormValues>({
+  const { register, handleSubmit, formState: { errors }, reset } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: { title: link.title, url: link.url },
   });
 
-  const onUpdate = async (data: FormValues) => {
+  const onSubmit = (data: FormValues) => {
     let domain = "google.com";
     const formattedUrl = data.url.startsWith('http') ? data.url : `https://${data.url}`;
-    try {
-      domain = new URL(formattedUrl).hostname;
-    } catch {}
+    try { domain = new URL(formattedUrl).hostname; } catch {}
 
-    try {
-      await updateDoc(doc(db, "users", profileUid, "links", link.id), {
-        title: data.title,
-        url: formattedUrl,
-        icon: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
-      });
-      setIsEditing(false);
-      onRefresh(); // 수정 완료 후 목록 갱신
-    } catch (error) {
-      console.error("Error updating document: ", error);
-      alert("링크 수정 중 오류가 발생했습니다.");
-    }
+    updateLink({ id: link.id, title: data.title, url: formattedUrl, domain });
+    setIsEditing(false); // 낙관적 업데이트로 로딩을 기다릴 필요 없이 즉시 수정 폼 닫기
   };
 
-  const handleDelete = async () => {
-    try {
-      setIsDeleting(true);
-      await deleteDoc(doc(db, "users", profileUid, "links", link.id));
-      setIsDeleteDialogOpen(false);
-      onRefresh(); // 삭제 완료 후 목록 갱신
-    } catch (error) {
-      console.error("Error deleting document: ", error);
-      alert("링크 삭제 중 오류가 발생했습니다.");
-    } finally {
-      setIsDeleting(false);
-    }
+  const handleDelete = () => {
+    deleteLink(link.id);
+    setIsDeleteDialogOpen(false); // 낙관적 업데이트로 모달 즉시 닫기
   };
 
   if (isEditing) {
     return (
-      <Card className="w-full p-5 border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 rounded-[20px] shadow-sm">
-        <form onSubmit={handleSubmit(onUpdate)} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor={`title-${link.id}`} className={errors.title ? "text-red-500" : ""}>링크 이름</Label>
-            <Input
-              id={`title-${link.id}`}
-              placeholder="예: 깃허브, 블로그"
-              {...register("title")}
-              className={errors.title ? "border-red-500 focus-visible:ring-red-500" : ""}
+      <Card className="p-4 w-full border-2 border-zinc-900 dark:border-zinc-100 shadow-sm rounded-[20px] bg-white dark:bg-zinc-900 animate-in fade-in duration-200">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-zinc-500">링크 이름</label>
+            <Input 
+              {...register("title")} 
+              className={errors.title ? "border-red-500 focus-visible:ring-red-500 bg-zinc-50 dark:bg-zinc-950" : "bg-zinc-50 dark:bg-zinc-950"} 
             />
-            {errors.title && <p className="text-sm text-red-500 font-medium">{errors.title.message}</p>}
+            {errors.title && <p className="text-xs text-red-500">{errors.title.message}</p>}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor={`url-${link.id}`} className={errors.url ? "text-red-500" : ""}>URL 주소</Label>
-            <Input
-              id={`url-${link.id}`}
-              placeholder="예: github.com/username"
-              {...register("url")}
-              className={errors.url ? "border-red-500 focus-visible:ring-red-500" : ""}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-zinc-500">URL 주소</label>
+            <Input 
+              {...register("url")} 
+              className={errors.url ? "border-red-500 focus-visible:ring-red-500 bg-zinc-50 dark:bg-zinc-950" : "bg-zinc-50 dark:bg-zinc-950"} 
             />
-            {errors.url && <p className="text-sm text-red-500 font-medium">{errors.url.message}</p>}
+            {errors.url && <p className="text-xs text-red-500">{errors.url.message}</p>}
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => { setIsEditing(false); reset(); }}>
-              <IconX className="w-4 h-4 mr-1" />
-              취소
+          <div className="flex gap-2 pt-2">
+            <Button variant="outline" type="button" className="flex-1 rounded-[16px]" onClick={() => { setIsEditing(false); reset(); }}>
+              <IconX className="w-4 h-4 mr-1" /> 취소
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              <IconCheck className="w-4 h-4 mr-1" />
-              {isSubmitting ? "저장 중..." : "저장"}
+            <Button type="submit" className="flex-1 rounded-[16px]">
+              <IconCheck className="w-4 h-4 mr-1" /> 저장
             </Button>
           </div>
         </form>
@@ -123,60 +89,69 @@ export function LinkCard({ link, isOwner, profileUid, onRefresh }: LinkCardProps
 
   return (
     <>
-      <div className="group relative w-full block">
-        <a href={link.url} target="_blank" rel="noopener noreferrer" className="w-full outline-none block">
+      <div className="group w-full relative block">
+        <a
+          href={link.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="outline-none block w-full"
+        >
           <Card className="relative flex items-center p-4 h-[68px] transition-all duration-300 ease-out border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md hover:-translate-y-1 hover:border-zinc-300 dark:hover:border-zinc-700 rounded-[20px] focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-300 cursor-pointer">
             <div className="absolute left-4 flex-shrink-0 w-11 h-11 flex items-center justify-center bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 rounded-full group-hover:scale-105 transition-transform duration-300">
               <img src={link.icon} alt={`${link.title} icon`} className="w-5 h-5 object-contain" />
             </div>
             
-            {/* Action buttons take up space on the right, so pad right accordingly */}
-            <div className={`w-full flex justify-center px-14 ${isOwner ? 'pr-24' : ''}`}>
+            <div className="w-full flex justify-center px-14">
               <span className="font-semibold text-[15px] tracking-tight text-zinc-800 dark:text-zinc-200 truncate">
                 {link.title}
               </span>
             </div>
           </Card>
         </a>
-        
+
         {isOwner && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="w-9 h-9 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-full transition-colors"
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="w-8 h-8 rounded-full bg-white dark:bg-zinc-900 shadow-sm border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800"
               onClick={(e) => { e.preventDefault(); setIsEditing(true); }}
             >
-              <IconEdit className="w-4.5 h-4.5" stroke={1.5} />
+              <IconEdit stroke={1.5} className="w-4 h-4 text-zinc-600 dark:text-zinc-400" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="w-9 h-9 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-full transition-colors"
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="w-8 h-8 rounded-full bg-white dark:bg-zinc-900 shadow-sm border border-red-100 dark:border-red-900/30 hover:bg-red-50 dark:hover:bg-red-900/20"
               onClick={(e) => { e.preventDefault(); setIsDeleteDialogOpen(true); }}
             >
-              <IconTrash className="w-4.5 h-4.5" stroke={1.5} />
+              <IconTrash stroke={1.5} className="w-4 h-4 text-red-500 dark:text-red-400" />
             </Button>
           </div>
         )}
       </div>
 
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>정말 삭제하시겠습니까?</DialogTitle>
-            <DialogDescription className="pt-2 text-base">
-              <span className="font-semibold text-zinc-900 dark:text-zinc-100">{link.title}</span>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center flex-shrink-0">
+                <IconAlertCircle className="w-6 h-6 text-red-600 dark:text-red-500" />
+              </div>
+              <DialogTitle className="text-xl">정말 삭제하시겠습니까?</DialogTitle>
+            </div>
+            <DialogDescription className="text-base mt-2">
+              <span className="font-semibold text-zinc-900 dark:text-zinc-100">"{link.title}"</span> 링크가 영구적으로 삭제됩니다.
               <br />
-              <span className="text-red-500 font-bold block mt-3">이 작업은 되돌릴 수 없습니다.</span>
+              이 작업은 되돌릴 수 없습니다.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex gap-2 sm:justify-end mt-4">
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} disabled={isDeleting}>
+          <DialogFooter className="flex gap-2 sm:gap-0 mt-6">
+            <Button variant="outline" className="flex-1 rounded-[16px]" onClick={() => setIsDeleteDialogOpen(false)}>
               취소
             </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-              {isDeleting ? "삭제 중..." : "삭제하기"}
+            <Button variant="destructive" className="flex-1 rounded-[16px]" onClick={handleDelete}>
+              삭제하기
             </Button>
           </DialogFooter>
         </DialogContent>
