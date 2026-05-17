@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { logout, signInWithGoogle } from "@/lib/auth";
+import { logout, signInWithGoogle, handleAuthRedirect } from "@/lib/auth";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -48,6 +48,9 @@ export default function Page() {
   });
 
   useEffect(() => {
+    // 리다이렉트 로그인 결과 처리
+    handleAuthRedirect().catch(console.error);
+
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       setIsAuthLoading(false);
@@ -87,7 +90,8 @@ export default function Page() {
 
   const handleLogin = async () => {
     try {
-      setIsAuthLoading(true);
+      // setIsAuthLoading(true)를 여기서 호출하면 React 렌더링 틱이 발생하여 
+      // 브라우저의 동기적 사용자 제스처(User Gesture) 컨텍스트가 끊어져 팝업 차단이 발생할 수 있습니다.
       await signInWithGoogle();
     } catch (error) {
       console.error(error);

@@ -1,5 +1,5 @@
 import { auth, db } from "@/lib/firebase";
-import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, User } from "firebase/auth";
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
 
 const googleProvider = new GoogleAuthProvider();
@@ -23,41 +23,60 @@ async function getUniqueDisplayName(baseName: string): Promise<string> {
   return displayName;
 }
 
+// Firestore에 유저 정보 동기화 (없으면 생성, 누락 시 백필)
+export const syncUserProfile = async (user: User) => {
+  const userDocRef = doc(db, "users", user.uid);
+  const userDoc = await getDoc(userDocRef);
+
+  let baseDisplayName = user.email ? user.email.split('@')[0] : user.uid.substring(0, 8);
+  let displayName = baseDisplayName;
+
+  if (!userDoc.exists()) {
+    displayName = await getUniqueDisplayName(baseDisplayName);
+    await setDoc(userDocRef, {
+      displayName: displayName,
+      username: user.displayName || displayName,
+      bio: "",
+      createdAt: new Date(),
+    });
+  } else {
+    const data = userDoc.data();
+    if (!data?.displayName) {
+      displayName = await getUniqueDisplayName(baseDisplayName);
+      await setDoc(userDocRef, { displayName: displayName }, { merge: true });
+    } else {
+      displayName = data.displayName;
+    }
+  }
+  return displayName;
+};
+
 export const signInWithGoogle = async () => {
   try {
     const result = await signInWithPopup(auth, googleProvider);
-    const user = result.user;
-
-    // Check if user exists in Firestore
-    const userDocRef = doc(db, "users", user.uid);
-    const userDoc = await getDoc(userDocRef);
-
-    let baseDisplayName = user.email ? user.email.split('@')[0] : user.uid.substring(0, 8);
-    let displayName = baseDisplayName;
-
-    if (!userDoc.exists()) {
-      displayName = await getUniqueDisplayName(baseDisplayName);
-      // Create new user profile
-      await setDoc(userDocRef, {
-        displayName: displayName,
-        username: user.displayName || displayName,
-        bio: "",
-        createdAt: new Date(),
-      });
+    const displayName = await syncUserProfile(result.user);
+    return { user: result.user, displayName };
+  } catch (error: any) {
+    if (error.code === 'auth/popup-blocked') {
+      console.warn("Popup blocked. Falling back to redirect...");
+      await signInWithRedirect(auth, googleProvider);
     } else {
-      const data = userDoc.data();
-      if (!data?.displayName) {
-        displayName = await getUniqueDisplayName(baseDisplayName);
-        // 기존 유저인데 displayName 필드가 누락된 경우 백필(Backfill)
-        await setDoc(userDocRef, { displayName: displayName }, { merge: true });
-      } else {
-        displayName = data.displayName;
-      }
+      console.error("Error signing in with Google: ", error);
+      throw error;
     }
+  }
+};
 
-    return { user, displayName };
+export const handleAuthRedirect = async () => {
+  try {
+    const result = await getRedirectResult(auth);
+    if (result?.user) {
+      const displayName = await syncUserProfile(result.user);
+      return { user: result.user, displayName };
+    }
+    return null;
   } catch (error) {
-    console.error("Error signing in with Google: ", error);
+    console.error("Error handling redirect result: ", error);
     throw error;
   }
 };
