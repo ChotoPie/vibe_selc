@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { collection, doc, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, serverTimestamp } from "firebase/firestore";
+import { collection, doc, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, serverTimestamp, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { LinkItem } from "@/data/links";
 
@@ -17,6 +17,7 @@ export function useLinks(uid: string | undefined) {
         title: doc.data().title,
         url: doc.data().url,
         icon: doc.data().icon,
+        clicks: doc.data().clicks || 0,
       }));
     },
     enabled: !!uid,
@@ -29,13 +30,15 @@ export function useLinks(uid: string | undefined) {
         title: data.title,
         url: data.url,
         icon: `https://www.google.com/s2/favicons?domain=${data.domain}&sz=128`,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        clicks: 0,
       });
       return {
         id: docRef.id,
         title: data.title,
         url: data.url,
         icon: `https://www.google.com/s2/favicons?domain=${data.domain}&sz=128`,
+        clicks: 0,
       };
     },
     onMutate: async (newData) => {
@@ -47,6 +50,7 @@ export function useLinks(uid: string | undefined) {
         title: newData.title,
         url: newData.url,
         icon: `https://www.google.com/s2/favicons?domain=${newData.domain}&sz=128`,
+        clicks: 0,
       };
 
       queryClient.setQueryData<LinkItem[]>(["links", uid], old => old ? [...old, optimisticLink] : [optimisticLink]);
@@ -118,6 +122,36 @@ export function useLinks(uid: string | undefined) {
     },
   });
 
+  const incrementClickMutation = useMutation({
+    mutationFn: async (linkId: string) => {
+      if (!uid) throw new Error("No user ID");
+      await updateDoc(doc(db, "users", uid, "links", linkId), {
+        clicks: increment(1)
+      });
+    },
+    onMutate: async (linkId) => {
+      await queryClient.cancelQueries({ queryKey: ["links", uid] });
+      const previousLinks = queryClient.getQueryData<LinkItem[]>(["links", uid]);
+
+      queryClient.setQueryData<LinkItem[]>(["links", uid], old => 
+        old?.map(link => 
+          link.id === linkId 
+            ? { ...link, clicks: (link.clicks || 0) + 1 }
+            : link
+        )
+      );
+      return { previousLinks };
+    },
+    onError: (err, linkId, context) => {
+      if (context?.previousLinks) {
+        queryClient.setQueryData(["links", uid], context.previousLinks);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["links", uid] });
+    },
+  });
+
   return {
     links: linksQuery.data || [],
     isLoading: linksQuery.isLoading,
@@ -125,5 +159,6 @@ export function useLinks(uid: string | undefined) {
     isAdding: addMutation.isPending,
     updateLink: updateMutation.mutate,
     deleteLink: deleteMutation.mutate,
+    incrementClick: incrementClickMutation.mutate,
   };
 }

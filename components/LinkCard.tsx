@@ -3,7 +3,7 @@ import { LinkItem } from "@/data/links";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { IconTrash, IconEdit, IconCheck, IconX, IconAlertCircle } from "@tabler/icons-react";
+import { IconTrash, IconEdit, IconCheck, IconX, IconAlertCircle, IconChartBar } from "@tabler/icons-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -31,7 +31,7 @@ interface LinkCardProps {
 }
 
 export function LinkCard({ link, isOwner, profileUid }: LinkCardProps) {
-  const { updateLink, deleteLink } = useLinks(profileUid);
+  const { updateLink, deleteLink, incrementClick } = useLinks(profileUid);
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -87,6 +87,10 @@ export function LinkCard({ link, isOwner, profileUid }: LinkCardProps) {
     );
   }
 
+  const handleLinkClick = () => {
+    incrementClick(link.id);
+  };
+
   return (
     <>
       <div className="group w-full relative block">
@@ -95,6 +99,7 @@ export function LinkCard({ link, isOwner, profileUid }: LinkCardProps) {
           target="_blank"
           rel="noopener noreferrer"
           className="outline-none block w-full"
+          onClick={handleLinkClick}
         >
           <Card className="relative flex items-center p-4 h-[68px] transition-all duration-300 ease-out border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md hover:-translate-y-1 hover:border-zinc-300 dark:hover:border-zinc-700 rounded-[20px] focus-visible:ring-2 focus-visible:ring-zinc-900 dark:focus-visible:ring-zinc-300 cursor-pointer">
             <div className="absolute left-4 flex-shrink-0 w-11 h-11 flex items-center justify-center bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 rounded-full group-hover:scale-105 transition-transform duration-300">
@@ -105,6 +110,12 @@ export function LinkCard({ link, isOwner, profileUid }: LinkCardProps) {
               <span className="font-semibold text-[15px] tracking-tight text-zinc-800 dark:text-zinc-200 truncate">
                 {link.title}
               </span>
+            </div>
+
+            {/* 클릭수 표시 (본인일 경우 호버 시 숨겨서 수정/삭제 버튼과 안 겹치게 함) */}
+            <div className={`absolute right-4 flex items-center gap-1 text-zinc-400 dark:text-zinc-500 text-xs font-semibold transition-opacity duration-200 ${isOwner ? 'group-hover:opacity-0' : ''}`}>
+              <IconChartBar stroke={2} className="w-3.5 h-3.5" />
+              <span>{link.clicks || 0}</span>
             </div>
           </Card>
         </a>
