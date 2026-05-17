@@ -1,13 +1,55 @@
-import { dummyLinks } from "@/data/links";
+"use client";
+
+import { useState } from "react";
+import { dummyLinks, LinkItem } from "@/data/links";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { IconShare } from "@tabler/icons-react";
+import { IconShare, IconPlus } from "@tabler/icons-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function Page() {
   // 프로필 더미 데이터 (PRD 기준: 프로필 이미지 없음, username과 bio 노출)
   const profile = {
     username: "개발자 홍길동",
     bio: "프론트엔드 개발자입니다.\n좋은 사용자 경험(UX)을 만드는 데 관심이 많습니다.",
+  };
+
+  const [links, setLinks] = useState<LinkItem[]>(dummyLinks);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [newLinkTitle, setNewLinkTitle] = useState("");
+  const [newLinkUrl, setNewLinkUrl] = useState("");
+
+  const handleAddLink = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newLinkTitle || !newLinkUrl) return;
+
+    let domain = "google.com";
+    try {
+      const url = new URL(newLinkUrl.startsWith('http') ? newLinkUrl : `https://${newLinkUrl}`);
+      domain = url.hostname;
+    } catch (error) {
+      // URL 파싱 에러 시 무시하고 기본값 사용
+    }
+
+    const newLink: LinkItem = {
+      id: crypto.randomUUID(),
+      title: newLinkTitle,
+      url: newLinkUrl.startsWith('http') ? newLinkUrl : `https://${newLinkUrl}`,
+      icon: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+    };
+
+    setLinks([...links, newLink]);
+    setNewLinkTitle("");
+    setNewLinkUrl("");
+    setIsDialogOpen(false);
   };
 
   return (
@@ -33,7 +75,45 @@ export default function Page() {
 
         {/* 링크 목록 영역 */}
         <div className="w-full flex flex-col gap-3">
-          {dummyLinks.map((link) => (
+          {/* 링크 추가 버튼 및 다이얼로그 */}
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="w-full h-14 rounded-[20px] border-dashed border-2 border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all">
+                <IconPlus className="w-5 h-5 mr-2" />
+                새 링크 추가
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>새 링크 추가</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleAddLink} className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="title">링크 이름</Label>
+                  <Input
+                    id="title"
+                    placeholder="예: 깃허브, 블로그"
+                    value={newLinkTitle}
+                    onChange={(e) => setNewLinkTitle(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="url">URL 주소</Label>
+                  <Input
+                    id="url"
+                    placeholder="예: github.com/username"
+                    value={newLinkUrl}
+                    onChange={(e) => setNewLinkUrl(e.target.value)}
+                  />
+                </div>
+                <div className="flex justify-end pt-4">
+                  <Button type="submit" disabled={!newLinkTitle || !newLinkUrl}>추가하기</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          {links.map((link) => (
             <a
               key={link.id}
               href={link.url}
