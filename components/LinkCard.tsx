@@ -33,10 +33,11 @@ type FormValues = z.infer<typeof formSchema>;
 interface LinkCardProps {
   link: LinkItem;
   isOwner: boolean;
+  profileUid: string;
   onRefresh: () => void;
 }
 
-export function LinkCard({ link, isOwner, onRefresh }: LinkCardProps) {
+export function LinkCard({ link, isOwner, profileUid, onRefresh }: LinkCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -54,7 +55,7 @@ export function LinkCard({ link, isOwner, onRefresh }: LinkCardProps) {
     } catch {}
 
     try {
-      await updateDoc(doc(db, "users", "anonymous", "links", link.id), {
+      await updateDoc(doc(db, "users", profileUid, "links", link.id), {
         title: data.title,
         url: formattedUrl,
         icon: `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
@@ -70,7 +71,7 @@ export function LinkCard({ link, isOwner, onRefresh }: LinkCardProps) {
   const handleDelete = async () => {
     try {
       setIsDeleting(true);
-      await deleteDoc(doc(db, "users", "anonymous", "links", link.id));
+      await deleteDoc(doc(db, "users", profileUid, "links", link.id));
       setIsDeleteDialogOpen(false);
       onRefresh(); // 삭제 완료 후 목록 갱신
     } catch (error) {
